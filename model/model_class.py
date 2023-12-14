@@ -1,51 +1,66 @@
-import numpy as np
-import matplotlib.pyplot as plt
-import pandas as pd
-from sklearn.preprocessing import LabelEncoder
-from sklearn.model_selection import train_test_split
-from PIL import Image
 import os
+
+import matplotlib.pyplot as plt
+import numpy as np
+import pandas as pd
 import tensorflow as tf
+from PIL import Image
+from scikeras.wrappers import KerasClassifier
+from sklearn.model_selection import GridSearchCV, train_test_split
+from sklearn.preprocessing import LabelEncoder
 
 
 class Model:
     def __init__(self) -> None:
         pass
 
-    def load_data(self, base_dir, labeled=True):
+    def load_data(self, base_dir):
         """
         Create a dataframe from a folder containing images.
         """
-        if labeled:
-            dir = {"images": [], "labels": []}
-            for i in os.listdir(base_dir):
-                img_dirs = os.path.join(base_dir, i)
-                for j in os.listdir(img_dirs):
-                    img = os.path.join(img_dirs, j)
-                    image = Image.open(img).resize((224, 224))
-                    image_array = tf.keras.utils.img_to_array(image)
-                    image_array = tf.expand_dims(image_array, 0)
-
-                    dir["images"].append(image_array)
-                    dir["labels"].append(i)
-        else:
-            dir = {"images": []}
-            for i in os.listdir(base_dir):
-                img_dir = os.path.join(base_dir, i)
-
-                image = Image.open(img_dir).resize((224, 224))
-                image_array = tf.keras.utils.img_to_array(image)
-                image_array = tf.expand_dims(image_array, 0)
-
-                dir["images"].append(image_array)
+        dir = {"images": [], "labels": []}
+        for folder_name in os.listdir(base_dir):
+            folder_path = os.path.join(base_dir, folder_name)
+            for image_name in os.listdir(folder_path):
+                image_path = os.path.join(folder_path, image_name)
+                image = Image.open(image_path).resize((224, 224))
+                # image_array = tf.keras.utils.img_to_array(image)
+                # image_array = tf.expand_dims(image_array, 0)
+                dir["images"].append(image)
+                dir["labels"].append(folder_name)
         df = pd.DataFrame(dir)
         return df
+    def load_data2(self, base_dir):
+        """
+        Create numpy arrays from a folder containing images.
+        """
+        images = []
+        labels = []
 
-    def describe_dataframe(self, df: pd.DataFrame):
+        for folder_name in os.listdir(base_dir):
+            folder_path = os.path.join(base_dir, folder_name)
+            for image_name in os.listdir(folder_path):
+                image_path = os.path.join(folder_path, image_name)
+                image = Image.open(image_path).resize((224, 224))
+                image_array = tf.keras.utils.img_to_array(image)
+                images.append(image_array)
+                labels.append(folder_name)
+
+        # Convert lists to numpy arrays
+        images = np.array(images)
+        labels = np.array(labels)
+
+        return images, labels
+
+    def convert_images_column_to_tensor(self, df: pd.DataFrame):
         """
-        Describe a dataframe.
+        Convert images column to tensor.
         """
-        df.describe()
+        df["images"] = df["images"].apply(lambda x: tf.keras.utils.img_to_array(x))
+        # df = df[df["images"].apply(lambda x: not np.all(x == x[0, 0, 0]))]
+        df["images"] = df["images"].apply(lambda x: tf.expand_dims(x, 0))
+
+        return df
 
     def get_dataframe_info(self, df: pd.DataFrame):
         """
@@ -77,12 +92,39 @@ class Model:
         """
         return df[df["labels"] == label].count()
 
+    def plot_five_images_from_each_label(self, df: pd.DataFrame):
+        """
+        Plot five images from each label.
+        """
+        fig, ax = plt.subplots(5, 5, figsize=(10, 10))
+        for i, label in enumerate(df["labels"].unique()):
+            for j, image in enumerate(df[df["labels"] == label]["images"][:5]):
+                ax[i, j].imshow(image)
+                ax[i, j].set_title(label)
+                ax[i, j].axis("off")
+        plt.tight_layout()
+        plt.show()
+
+    def select_max_items_per_label(self, df: pd.DataFrame, max_items_per_label=700):
+        """
+        Select max items per label.
+        """
+        df = df.groupby("labels").tail(max_items_per_label)
+        return df
+
     def encode_labels(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         Encode labels.
         """
         le = LabelEncoder()
         df["labels"] = le.fit_transform(df["labels"])
+        return df
+    
+    def one_hot_encode_labels(self, df: pd.DataFrame) -> pd.DataFrame:
+        """
+        One hot encode labels.
+        """
+        df["labels"] = tf.keras.utils.to_categorical(df["labels"])
         return df
 
     def normalise_images(self, df: pd.DataFrame) -> pd.DataFrame:
@@ -131,48 +173,155 @@ class Model:
         return y_train, y_test, y_val
 
     def build_model(
-        self, filters, kernel, pool_size, strides, dropout_rate, dense_units, lr
+        self,
+        input_shape=(224, 224, 3),
+        filters_1=32,
+        filters_2=64,
+        filters_3=128,
+        filters_4=256,
+        filters_5=512,
+        kernel_size=(3, 3),
+        pool_size=(2, 2),
+        dense_units_1=128,
+        dense_units_2=256,
+        dropout_conv=0.2,
+        dropout_dense=0.3,
+        learning_rate=0.001,
+        optimizer_choice="adam",
+        l1_reg=0.01,
+        l2_reg=0.01,
     ):
         """
-        Build model.
+        Build and compile a CNN model.
         """
-        model = tf.keras.Sequential(
-            [
-                tf.keras.layers.Conv2D(
-                    filters=filters,
-                    kernel_size=kernel,
-                    activation="relu",
-                    input_shape=(224, 224, 3),
-                    padding="same",
-                    strides=strides,
-                ),
-                tf.keras.layers.MaxPool2D(
-                    pool_size=pool_size, strides=strides, padding="same"
-                ),
-                tf.keras.layers.Dropout(dropout_rate),
-                tf.keras.layers.Conv2D(
-                    filters=64,
-                    kernel_size=kernel,
-                    activation="relu",
-                    padding="same",
-                    strides=strides,
-                ),
-                tf.keras.layers.MaxPool2D(pool_size=pool_size, strides=strides),
-                tf.keras.layers.Dropout(dropout_rate),
-                tf.keras.layers.Flatten(),
-                tf.keras.layers.Dense(dense_units, activation="relu"),
-                tf.keras.layers.Dropout(dropout_rate),
-                tf.keras.layers.Dense(512, activation="relu"),
-                tf.keras.layers.Dropout(dropout_rate),
-                tf.keras.layers.Dense(units=5, activation="softmax"),
-            ]
-        )
-        model.compile(
-            optimizer="Adam", loss="categorical_crossentropy", metrics=["accuracy"]
-        )
+        if optimizer_choice == "SGD":
+            optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=0.9)
+        elif optimizer_choice == "adam":
+            optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
+        else:
+            optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
+
+        model = tf.keras.Sequential([
+            # 1st Convolutional Layer
+            tf.keras.layers.Conv2D(
+                filters=filters_1,
+                kernel_size=kernel_size,
+                activation='relu',
+                input_shape=input_shape,
+                padding='same'
+            ),
+            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
+            tf.keras.layers.Dropout(dropout_conv),
+
+            # 2nd Convolutional Layer
+            tf.keras.layers.Conv2D(
+                filters=filters_2,
+                kernel_size=kernel_size,
+                activation='relu',
+                padding='same'
+            ),
+            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
+            tf.keras.layers.Dropout(dropout_conv),
+
+            # 3rd Convolutional Layer
+            tf.keras.layers.Conv2D(
+                filters=filters_3,
+                kernel_size=kernel_size,
+                activation='relu',
+                padding='same'
+            ),
+            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
+            tf.keras.layers.Dropout(dropout_conv),
+
+            #4th Convolutional Layer
+            tf.keras.layers.Conv2D(
+                filters=filters_4,
+                kernel_size=kernel_size,
+                activation='relu',
+                padding='same'
+            ),
+            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
+            tf.keras.layers.Dropout(dropout_conv),
+            
+            # 5th Convolutional Layer
+            tf.keras.layers.Conv2D(
+                filters=filters_5,
+                kernel_size=kernel_size,
+                activation='relu',
+                padding='same'
+            ),
+            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
+            tf.keras.layers.Dropout(dropout_conv),
+            # Flatten the data for upcoming dense layers
+            tf.keras.layers.Flatten(),
+
+            # 1st Dense Layer
+            tf.keras.layers.Dense(
+                dense_units_1, 
+                activation='relu',
+                kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
+            ),
+            tf.keras.layers.Dropout(dropout_dense),
+
+            # 2nd Dense Layer
+            tf.keras.layers.Dense(
+                dense_units_2, 
+                activation='relu',
+                kernel_regularizer=tf.keras.regularizers.l1(l2_reg)
+            ),
+            tf.keras.layers.Dropout(dropout_dense),
+
+            # Output Layer
+            tf.keras.layers.Dense(5, activation='softmax')
+        ])
+
+        model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
         return model
 
-    def train_model(self, model, X_train, y_train, X_val, y_val, epochs, batch_size):
+
+    def grid_search(self, build_model, X_train, y_train):
+        """
+        Grid search.
+        """
+        model = KerasClassifier(
+            build_fn=build_model,
+            verbose=0,
+            filters_2=32,
+            filters_3=64,
+            dense_units_1=64,
+            dense_units_2=128,
+            pool_size=2,
+            strides=2,
+            learning_rate=0.001,
+            padding="same",
+            optimizer="adam",
+            l1=0.01,
+            l2=0.01,
+        )
+        param_grid = dict(
+            filters_2=[32, 64],
+            filters_3=[64, 128],
+            dense_units_1=[64, 128],
+            dense_units_2=[64, 128, 256],
+            pool_size=[2, 3],
+            strides=[2, 3],
+            learning_rate=[0.001, 0.01],
+            padding=["same", "valid"],
+            optimizer=["SGD", "Adam"],
+            l1=[0.01, 0.001],
+            l2=[0.01, 0.001],
+        )
+        grid = GridSearchCV(
+            estimator=model,
+            param_grid=param_grid,
+            cv=2,
+            verbose=0,
+            return_train_score=True,
+        )
+        grid_result = grid.fit(X_train, y_train, epochs=10, batch_size=32, verbose=0)
+        return grid_result
+
+    def train_model(self, model, X_train, y_train, X_val, y_val, epochs, batch_size, early_stopping):
         """
         Train model.
         """
@@ -182,8 +331,18 @@ class Model:
             validation_data=(X_val, y_val),
             epochs=epochs,
             batch_size=batch_size,
+            callbacks=[early_stopping],
         )
         return history
+
+    def convert_encoded_labels_to_labels(self, y_label):
+        """
+        Convert encoded labels to labels.
+        """
+        le = LabelEncoder()
+        y_label = le.inverse_transform(y_label)
+
+        return y_label
 
     def plot_accuracy(self, history):
         """
@@ -207,3 +366,17 @@ class Model:
         plt.legend()
 
         plt.show()
+
+    def evaluate_model(self, model, X_test, y_test, y_train):
+        """
+        Evaluate model.
+        """
+        model.evaluate(X_test, y_test)
+        print(f"y_train: \n {y_train[10]},\n y_test: \n {y_test[10]}")
+
+    def predict(self, model, X_test):
+        """
+        Predict.
+        """
+        y_pred = model.predict(X_test)
+        return y_pred
