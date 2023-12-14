@@ -9,6 +9,9 @@ pandas = "*"
 scikit-learn = "*"
 matplotlib = "*"
 tensorflow = "*"
+scikeras = "*"
+black = "*"
+isort = "*"
 
 [dev-packages]
 ipykernel = "*"
