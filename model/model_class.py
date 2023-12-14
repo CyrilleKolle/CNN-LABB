@@ -30,6 +30,7 @@ class Model:
                 dir["labels"].append(folder_name)
         df = pd.DataFrame(dir)
         return df
+
     def load_data2(self, base_dir):
         """
         Create numpy arrays from a folder containing images.
@@ -57,7 +58,6 @@ class Model:
         Convert images column to tensor.
         """
         df["images"] = df["images"].apply(lambda x: tf.keras.utils.img_to_array(x))
-        # df = df[df["images"].apply(lambda x: not np.all(x == x[0, 0, 0]))]
         df["images"] = df["images"].apply(lambda x: tf.expand_dims(x, 0))
 
         return df
@@ -119,7 +119,7 @@ class Model:
         le = LabelEncoder()
         df["labels"] = le.fit_transform(df["labels"])
         return df
-    
+
     def one_hot_encode_labels(self, df: pd.DataFrame) -> pd.DataFrame:
         """
         One hot encode labels.
@@ -195,89 +195,87 @@ class Model:
         Build and compile a CNN model.
         """
         if optimizer_choice == "SGD":
-            optimizer = tf.keras.optimizers.SGD(learning_rate=learning_rate, momentum=0.9)
+            optimizer = tf.keras.optimizers.SGD(
+                learning_rate=learning_rate, momentum=0.9
+            )
         elif optimizer_choice == "adam":
             optimizer = tf.keras.optimizers.Adam(learning_rate=learning_rate)
         else:
             optimizer = tf.keras.optimizers.RMSprop(learning_rate=learning_rate)
 
-        model = tf.keras.Sequential([
-            # 1st Convolutional Layer
-            tf.keras.layers.Conv2D(
-                filters=filters_1,
-                kernel_size=kernel_size,
-                activation='relu',
-                input_shape=input_shape,
-                padding='same'
-            ),
-            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
-            tf.keras.layers.Dropout(dropout_conv),
+        model = tf.keras.Sequential(
+            [
+                # 1st Convolutional Layer
+                tf.keras.layers.Conv2D(
+                    filters=filters_1,
+                    kernel_size=kernel_size,
+                    activation="relu",
+                    input_shape=input_shape,
+                    padding="same",
+                ),
+                tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding="same"),
+                tf.keras.layers.Dropout(dropout_conv),
+                # 2nd Convolutional Layer
+                tf.keras.layers.Conv2D(
+                    filters=filters_2,
+                    kernel_size=kernel_size,
+                    activation="relu",
+                    padding="same",
+                ),
+                tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding="same"),
+                tf.keras.layers.Dropout(dropout_conv),
+                # 3rd Convolutional Layer
+                tf.keras.layers.Conv2D(
+                    filters=filters_3,
+                    kernel_size=kernel_size,
+                    activation="relu",
+                    padding="same",
+                ),
+                tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding="same"),
+                tf.keras.layers.Dropout(dropout_conv),
+                # 4th Convolutional Layer
+                tf.keras.layers.Conv2D(
+                    filters=filters_4,
+                    kernel_size=kernel_size,
+                    activation="relu",
+                    padding="same",
+                ),
+                tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding="same"),
+                tf.keras.layers.Dropout(dropout_conv),
+                # 5th Convolutional Layer
+                tf.keras.layers.Conv2D(
+                    filters=filters_5,
+                    kernel_size=kernel_size,
+                    activation="relu",
+                    padding="same",
+                ),
+                tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding="same"),
+                tf.keras.layers.Dropout(dropout_conv),
+                # Flatten the data for upcoming dense layers
+                tf.keras.layers.Flatten(),
+                # 1st Dense Layer
+                tf.keras.layers.Dense(
+                    dense_units_1,
+                    activation="relu",
+                    kernel_regularizer=tf.keras.regularizers.l2(l2_reg),
+                ),
+                tf.keras.layers.Dropout(dropout_dense),
+                # 2nd Dense Layer
+                tf.keras.layers.Dense(
+                    dense_units_2,
+                    activation="relu",
+                    kernel_regularizer=tf.keras.regularizers.l1(l2_reg),
+                ),
+                tf.keras.layers.Dropout(dropout_dense),
+                # Output Layer
+                tf.keras.layers.Dense(5, activation="softmax"),
+            ]
+        )
 
-            # 2nd Convolutional Layer
-            tf.keras.layers.Conv2D(
-                filters=filters_2,
-                kernel_size=kernel_size,
-                activation='relu',
-                padding='same'
-            ),
-            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
-            tf.keras.layers.Dropout(dropout_conv),
-
-            # 3rd Convolutional Layer
-            tf.keras.layers.Conv2D(
-                filters=filters_3,
-                kernel_size=kernel_size,
-                activation='relu',
-                padding='same'
-            ),
-            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
-            tf.keras.layers.Dropout(dropout_conv),
-
-            #4th Convolutional Layer
-            tf.keras.layers.Conv2D(
-                filters=filters_4,
-                kernel_size=kernel_size,
-                activation='relu',
-                padding='same'
-            ),
-            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
-            tf.keras.layers.Dropout(dropout_conv),
-            
-            # 5th Convolutional Layer
-            tf.keras.layers.Conv2D(
-                filters=filters_5,
-                kernel_size=kernel_size,
-                activation='relu',
-                padding='same'
-            ),
-            tf.keras.layers.MaxPooling2D(pool_size=pool_size, padding='same'),
-            tf.keras.layers.Dropout(dropout_conv),
-            # Flatten the data for upcoming dense layers
-            tf.keras.layers.Flatten(),
-
-            # 1st Dense Layer
-            tf.keras.layers.Dense(
-                dense_units_1, 
-                activation='relu',
-                kernel_regularizer=tf.keras.regularizers.l2(l2_reg)
-            ),
-            tf.keras.layers.Dropout(dropout_dense),
-
-            # 2nd Dense Layer
-            tf.keras.layers.Dense(
-                dense_units_2, 
-                activation='relu',
-                kernel_regularizer=tf.keras.regularizers.l1(l2_reg)
-            ),
-            tf.keras.layers.Dropout(dropout_dense),
-
-            # Output Layer
-            tf.keras.layers.Dense(5, activation='softmax')
-        ])
-
-        model.compile(optimizer=optimizer, loss='categorical_crossentropy', metrics=['accuracy'])
+        model.compile(
+            optimizer=optimizer, loss="categorical_crossentropy", metrics=["accuracy"]
+        )
         return model
-
 
     def grid_search(self, build_model, X_train, y_train):
         """
@@ -321,7 +319,9 @@ class Model:
         grid_result = grid.fit(X_train, y_train, epochs=10, batch_size=32, verbose=0)
         return grid_result
 
-    def train_model(self, model, X_train, y_train, X_val, y_val, epochs, batch_size, early_stopping):
+    def train_model(
+        self, model, X_train, y_train, X_val, y_val, epochs, batch_size, early_stopping
+    ):
         """
         Train model.
         """
