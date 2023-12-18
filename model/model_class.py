@@ -31,28 +31,6 @@ class Model:
         df = pd.DataFrame(dir)
         return df
 
-    def load_data2(self, base_dir):
-        """
-        Create numpy arrays from a folder containing images.
-        """
-        images = []
-        labels = []
-
-        for folder_name in os.listdir(base_dir):
-            folder_path = os.path.join(base_dir, folder_name)
-            for image_name in os.listdir(folder_path):
-                image_path = os.path.join(folder_path, image_name)
-                image = Image.open(image_path).resize((224, 224))
-                image_array = tf.keras.utils.img_to_array(image)
-                images.append(image_array)
-                labels.append(folder_name)
-
-        # Convert lists to numpy arrays
-        images = np.array(images)
-        labels = np.array(labels)
-
-        return images, labels
-
     def convert_images_column_to_tensor(self, df: pd.DataFrame):
         """
         Convert images column to tensor.
