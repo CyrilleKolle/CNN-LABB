@@ -1,3 +1,10 @@
+# CNN Image Classification LABB 1
+
+### Image data has been removed to allow for reduced size before submission
+
+#### Images can be downloaded from [flower recognition](https://www.kaggle.com/datasets/alxmamaev/flowers-recognition)
+
+
 Frågor:
 • Motivera din modellarkitektur och val av relevanta hyperparametrar.
 • Vilka aktiveringsfunktioner har du använt? Varför?
