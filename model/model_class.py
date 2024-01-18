@@ -358,3 +358,12 @@ class Model:
         """
         y_pred = model.predict(X_test)
         return y_pred
+    
+    def confusion_matrix(self, y_test, y_pred):
+        """
+        Confusion matrix.
+        """
+        confusion_matrix = tf.math.confusion_matrix(
+            labels=tf.argmax(y_test, 1), predictions=tf.argmax(y_pred, 1)
+        )
+        return confusion_matrix
